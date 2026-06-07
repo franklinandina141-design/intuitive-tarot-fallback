@@ -506,19 +506,17 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--parchment);
   }
 
   html[data-mobile-fallback="true"] #stage-wrap{
-    flex:0 0 min(58svh,430px);
-    min-height:min(58svh,430px);
-    width:100vw;
-    margin:0 -10px;
-    overflow:hidden;
-    touch-action:pan-x;
-    cursor:grab;
-    -webkit-mask-image:linear-gradient(90deg,transparent 0%,#000 10%,#000 90%,transparent 100%);
-    mask-image:linear-gradient(90deg,transparent 0%,#000 10%,#000 90%,transparent 100%);
+    flex:0 0 min(54svh,390px);
+    min-height:min(54svh,390px);
+    width:100%;
+    margin:0;
+    overflow:visible;
+    touch-action:none;
+    cursor:pointer;
   }
 
   html[data-mobile-fallback="true"] #stage-wrap::before{
-    content:'滑动牌面 或轻点一张牌';
+    content:'手指滑过牌面 或轻点一张牌';
     position:absolute;
     left:50%;
     bottom:6px;
@@ -980,13 +978,13 @@ function getLayout(){
   const isMobile = VW <= MOBILE_DRAW_BREAKPOINT;
   const mobileMaxCardHeight = Math.floor(sH*0.88);
   const desktopMaxCardHeight = Math.floor(sH*0.76);
-  const mobileWidthFactor = 0.24;
+  const mobileWidthFactor = 0.205;
   const desktopWidthFactor = 0.13;
   const ch    = isMobile
-    ? Math.min(mobileMaxCardHeight, 196, Math.floor(VW*mobileWidthFactor/0.618))
+    ? Math.min(mobileMaxCardHeight, 170, Math.floor(VW*mobileWidthFactor/0.618))
     : Math.min(desktopMaxCardHeight, 134, Math.floor(VW*desktopWidthFactor));
   const cw    = Math.round(ch*0.618);
-  const mobileCenterScale = isMobile ? 1.18 : 1.08;
+  const mobileCenterScale = isMobile ? 1.22 : 1.08;
   const stageVisualCenterY = Math.max(ch/2, Math.min(sH - ch/2, sH*0.5));
   return {VW,VH,sTop,sBot,sH,cw,ch,isMobile,mobileCenterScale,stageVisualCenterY};
 }
@@ -996,11 +994,11 @@ function calcArcPts(n,sH,VW,cw,ch,sTop,stageVisualCenterY){
   const cx=VW/2;
   const midY=sTop+stageVisualCenterY;
   const isMobile=VW<=MOBILE_DRAW_BREAKPOINT;
-  const margin=isMobile?Math.max(cw*.5,26):Math.max(cw*.45,48);
-  const totalW=isMobile?Math.max(VW*1.95,n*cw*.38):VW-margin*2;
+  const margin=isMobile?Math.max(cw*.5,28):Math.max(cw*.45,48);
+  const totalW=isMobile?Math.min(VW-56,cw*3.2):VW-margin*2;
   const step=n>1?totalW/(n-1):0;
-  const arcDip=isMobile?Math.min(sH*0.065,24):Math.min(sH*0.10,36);
-  const maxRot=isMobile?10:18;
+  const arcDip=isMobile?Math.min(sH*0.085,28):Math.min(sH*0.10,36);
+  const maxRot=isMobile?22:18;
   const pts=[];
   for(let i=0;i<n;i++){
     const t=n===1?0:(i/(n-1))*2-1;
@@ -1080,77 +1078,84 @@ function _buildFan(animate){
 function isMobileDraw(){
   return window.innerWidth<=MOBILE_DRAW_BREAKPOINT;
 }
-function clampMobileFanX(x){
-  if(!arcPts.length||!isMobileDraw()) return 0;
-  const minLeft=Math.min(...arcPts.map(p=>p.left));
-  const maxRight=Math.max(...arcPts.map(p=>p.left+CW));
-  const minX=Math.min(0,window.innerWidth-maxRight-window.innerWidth*.08);
-  const maxX=Math.max(0,-minLeft+window.innerWidth*.08);
-  return Math.max(minX,Math.min(maxX,x));
+function resetMobilePeek(){
+  stageEl.querySelectorAll('.card.peek').forEach(el=>{
+    const idx=+el.dataset.i;
+    el.classList.remove('peek');
+    if(arcPts[idx]&&!el.classList.contains('pk')&&!el.classList.contains('dm')){
+      el.style.transform=`rotateZ(${arcPts[idx].rot}deg)`;
+      el.style.zIndex=idx;
+    }
+  });
+  mobilePeekIdx=-1;
 }
 function applyMobileFanTransform(){
   if(!stageEl) return;
-  if(!isMobileDraw()){
-    stageEl.style.transform='';
-    return;
-  }
-  mobileFanX=clampMobileFanX(mobileFanX);
-  stageEl.style.transform=`translateX(${mobileFanX}px)`;
+  stageEl.style.transform='';
 }
-function getCenterCardIndex(){
-  if(!arcPts.length) return -1;
-  const center=window.innerWidth/2;
+function getCardIndexFromPoint(x,y){
+  const cards=[...stageEl.querySelectorAll('.card:not(.pk):not(.dm)')];
   let best=-1,bestDist=Infinity;
-  arcPts.forEach((p,i)=>{
-    if(drawn.includes(i)) return;
-    const dist=Math.abs((p.left+mobileFanX+CW/2)-center);
-    if(dist<bestDist){best=i;bestDist=dist;}
-  });
+  for(const el of cards){
+    const r=el.getBoundingClientRect();
+    const hit=x>=r.left-8&&x<=r.right+8&&y>=r.top-22&&y<=r.bottom+18;
+    if(!hit) continue;
+    const cx=r.left+r.width/2,cy=r.top+r.height/2;
+    const dist=Math.hypot(x-cx,y-cy);
+    if(dist<bestDist){best=+el.dataset.i;bestDist=dist;}
+  }
   return best;
 }
-function updateMobilePeek(){
-  if(!isMobileDraw()) return;
-  const idx=getCenterCardIndex();
+function updateMobilePeek(idx){
+  if(!isMobileDraw()||idx<0||drawn.includes(idx)) return;
   if(idx===mobilePeekIdx) return;
-  stageEl.querySelectorAll('.card.peek').forEach(el=>el.classList.remove('peek'));
-  mobilePeekIdx=idx;
+  resetMobilePeek();
   const el=stageEl.querySelector(`[data-i="${idx}"]`);
-  if(el&&!el.classList.contains('pk')&&!el.classList.contains('dm')) el.classList.add('peek');
+  if(!el||el.classList.contains('pk')||el.classList.contains('dm')) return;
+  mobilePeekIdx=idx;
+  el.classList.add('peek');
+  el.style.zIndex=3000;
+  el.style.transform=`translateY(-30px) rotateZ(0deg) scale(1.08)`;
 }
 function initMobileFanDrag(){
   stWrap.addEventListener('pointerdown',e=>{
     if(!isMobileDraw()||picking||done) return;
-    mobileDrag={startX:e.clientX,lastX:e.clientX,baseX:mobileFanX,moved:false};
+    const idx=getCardIndexFromPoint(e.clientX,e.clientY);
+    mobileDrag={startX:e.clientX,startY:e.clientY,lastIdx:idx,moved:false};
     stWrap.setPointerCapture?.(e.pointerId);
     stopSway();
+    if(idx>=0) updateMobilePeek(idx);
   });
   stWrap.addEventListener('pointermove',e=>{
     if(!mobileDrag||!isMobileDraw()||picking||done) return;
-    const dx=e.clientX-mobileDrag.startX;
-    mobileDrag.lastX=e.clientX;
-    if(Math.abs(dx)>8) mobileDrag.moved=true;
-    mobileFanX=clampMobileFanX(mobileDrag.baseX+dx);
-    applyMobileFanTransform();
-    updateMobilePeek();
+    if(Math.hypot(e.clientX-mobileDrag.startX,e.clientY-mobileDrag.startY)>6) mobileDrag.moved=true;
+    const idx=getCardIndexFromPoint(e.clientX,e.clientY);
+    if(idx>=0){
+      mobileDrag.lastIdx=idx;
+      updateMobilePeek(idx);
+    }
   });
   function finishDrag(e){
     if(!mobileDrag) return;
-    const moved=mobileDrag.moved;
+    const idx=mobileDrag.lastIdx;
     mobileDrag=null;
     stWrap.releasePointerCapture?.(e.pointerId);
-    updateMobilePeek();
-    if(moved&&mobilePeekIdx>=0&&!picking&&!done) onPick(mobilePeekIdx);
-    else if(!picking&&!done) startSway();
+    if(idx>=0&&!picking&&!done) onPick(idx);
+    else if(!picking&&!done){resetMobilePeek();startSway();}
   }
   stWrap.addEventListener('pointerup',finishDrag);
-  stWrap.addEventListener('pointercancel',finishDrag);
+  stWrap.addEventListener('pointercancel',()=>{
+    mobileDrag=null;
+    resetMobilePeek();
+    if(!picking&&!done) startSway();
+  });
 }
 
 /* ══ 摇摆 ══ */
 function startSway(){
   stopSway();
   if(isMobileDraw()){
-    updateMobilePeek();
+    resetMobilePeek();
     return;
   }
   const SPD=.008,MAX=2.8;
