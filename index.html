@@ -952,7 +952,7 @@ function _buildFan(animate){
       <div class="cb"><div class="cb-sym">${BSYMS[i%BSYMS.length]}</div></div>
       <div class="cf">
         <div class="img-wrap">
-          <img src="${c.img}" alt="${c.zh}" loading="lazy" referrerpolicy="no-referrer" data-fb="${encodeURIComponent(c.fallback)}"
+          <img src="${c.img}" alt="${c.zh}" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-fb="${encodeURIComponent(c.fallback)}"
             onload="markImageLoaded(this)"
             onerror="tarotImgFallback(this)">
           <div class="csv" style="display:none">${mkSvg(c.s,c.c)}</div>
@@ -1055,7 +1055,7 @@ function buildReadingScreen(){
     slot.innerHTML=`
       <div class="r-card${c.rev?' rv':''}" style="width:${rw}px;height:${rh}px">
         <div class="img-wrap">
-          <img src="${c.img}" alt="${c.zh}" referrerpolicy="no-referrer" data-fb="${encodeURIComponent(c.fallback)}"
+          <img src="${c.img}" alt="${c.zh}" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-fb="${encodeURIComponent(c.fallback)}"
             onload="markImageLoaded(this)"
             onerror="tarotReadingImgFallback(this)">
         </div>
