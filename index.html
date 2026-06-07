@@ -486,9 +486,12 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--parchment);
   }
 
   html[data-mobile-fallback="true"] .cover-title{
-    max-width:94vw;
-    font-size:clamp(30px,9vw,38px);
-    letter-spacing:.02em;
+    width:fit-content;
+    max-width:96vw;
+    font-size:clamp(26px,7.2vw,32px);
+    line-height:1.08;
+    letter-spacing:.005em;
+    white-space:nowrap;
   }
 
   html[data-mobile-fallback="true"] #s1{
