@@ -107,8 +107,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--parchment);
   letter-spacing:.42em;color:var(--gold-dim);text-transform:uppercase;margin-bottom:12px;
   opacity:0;animation:fu 1s ease .35s both;}
 
-.cover-title{font-family:'Cinzel Decorative',serif;font-size:clamp(28px,5vw,58px);
-  letter-spacing:.06em;color:var(--ink);
+.cover-title{font-family:'IM Fell English',Georgia,serif;font-style:italic;font-weight:400;font-size:clamp(28px,5vw,58px);
+  letter-spacing:.035em;color:var(--ink);white-space:nowrap;
   text-shadow:0 0 40px rgba(201,168,76,.18),0 0 80px rgba(201,168,76,.08);
   text-align:center;margin-bottom:8px;
   opacity:0;animation:fu 1.4s cubic-bezier(.2,.8,.2,1) .3s both;}
@@ -483,6 +483,70 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--parchment);
   html[data-mobile-fallback="true"] #screens{
     transition:transform .36s cubic-bezier(.4,0,.2,1);
     will-change:transform;
+  }
+
+  html[data-mobile-fallback="true"] .cover-title{
+    max-width:94vw;
+    font-size:clamp(30px,9vw,38px);
+    letter-spacing:.02em;
+  }
+
+  html[data-mobile-fallback="true"] #s1{
+    justify-content:center;
+    gap:12px;
+    padding:calc(env(safe-area-inset-top) + 44px) 10px calc(env(safe-area-inset-bottom) + 16px);
+  }
+
+  html[data-mobile-fallback="true"] .pick-top{
+    position:relative;
+    z-index:2;
+  }
+
+  html[data-mobile-fallback="true"] #stage-wrap{
+    flex:0 0 min(58svh,430px);
+    min-height:min(58svh,430px);
+    width:100vw;
+    margin:0 -10px;
+    overflow:hidden;
+    touch-action:pan-x;
+    cursor:grab;
+    -webkit-mask-image:linear-gradient(90deg,transparent 0%,#000 10%,#000 90%,transparent 100%);
+    mask-image:linear-gradient(90deg,transparent 0%,#000 10%,#000 90%,transparent 100%);
+  }
+
+  html[data-mobile-fallback="true"] #stage-wrap::before{
+    content:'滑动牌面 或轻点一张牌';
+    position:absolute;
+    left:50%;
+    bottom:6px;
+    transform:translateX(-50%);
+    z-index:4;
+    color:rgba(201,168,76,.46);
+    font-family:'IM Fell English',Georgia,serif;
+    font-size:12px;
+    letter-spacing:.08em;
+    pointer-events:none;
+    white-space:nowrap;
+  }
+
+  html[data-mobile-fallback="true"] #stage{
+    left:0;
+    right:auto;
+    width:100vw;
+    will-change:transform;
+  }
+
+  html[data-mobile-fallback="true"] .card{
+    transition:opacity .3s, transform .18s ease-out;
+  }
+
+  html[data-mobile-fallback="true"] .card.peek{
+    filter:drop-shadow(0 20px 28px rgba(0,0,0,.55));
+  }
+
+  html[data-mobile-fallback="true"] .pick-bot{
+    position:relative;
+    z-index:3;
   }
 
   html[data-mobile-fallback="true"] .card,
@@ -863,6 +927,7 @@ function mkSvg(s,c){
 const BSYMS=['✦','☽','✧','⊕','△','☿'];
 let deck=[],drawn=[],picking=false,done=false;
 let raf=null,sway=0,swayDir=1,arcPts=[],CW=0,CH=0;
+let mobileFanX=0,mobileDrag=null,mobilePeekIdx=-1;
 let lastReadingText='',currentScreen=0,userQuestion='';
 
 const screensEl = document.getElementById('screens');
@@ -912,13 +977,13 @@ function getLayout(){
   const isMobile = VW <= MOBILE_DRAW_BREAKPOINT;
   const mobileMaxCardHeight = Math.floor(sH*0.88);
   const desktopMaxCardHeight = Math.floor(sH*0.76);
-  const mobileWidthFactor = 0.185;
+  const mobileWidthFactor = 0.24;
   const desktopWidthFactor = 0.13;
   const ch    = isMobile
-    ? Math.min(mobileMaxCardHeight, 168, Math.floor(VW*mobileWidthFactor/0.618))
+    ? Math.min(mobileMaxCardHeight, 196, Math.floor(VW*mobileWidthFactor/0.618))
     : Math.min(desktopMaxCardHeight, 134, Math.floor(VW*desktopWidthFactor));
   const cw    = Math.round(ch*0.618);
-  const mobileCenterScale = isMobile ? 1.16 : 1.08;
+  const mobileCenterScale = isMobile ? 1.18 : 1.08;
   const stageVisualCenterY = Math.max(ch/2, Math.min(sH - ch/2, sH*0.5));
   return {VW,VH,sTop,sBot,sH,cw,ch,isMobile,mobileCenterScale,stageVisualCenterY};
 }
@@ -927,11 +992,12 @@ function getLayout(){
 function calcArcPts(n,sH,VW,cw,ch,sTop,stageVisualCenterY){
   const cx=VW/2;
   const midY=sTop+stageVisualCenterY;
-  const margin=Math.max(cw*0.45,VW<=MOBILE_DRAW_BREAKPOINT?20:48);
-  const totalW=VW-margin*2;
+  const isMobile=VW<=MOBILE_DRAW_BREAKPOINT;
+  const margin=isMobile?Math.max(cw*.5,26):Math.max(cw*.45,48);
+  const totalW=isMobile?Math.max(VW*1.95,n*cw*.38):VW-margin*2;
   const step=n>1?totalW/(n-1):0;
-  const arcDip=Math.min(sH*0.10,36);
-  const maxRot=18;
+  const arcDip=isMobile?Math.min(sH*0.065,24):Math.min(sH*0.10,36);
+  const maxRot=isMobile?10:18;
   const pts=[];
   for(let i=0;i<n;i++){
     const t=n===1?0:(i/(n-1))*2-1;
@@ -965,9 +1031,12 @@ function buildFan(animate){
 function _buildFan(animate){
   stageEl.innerHTML='';
   stageEl.className='sel';
-  const {VW,VH,sTop,sBot,sH,cw,ch,stageVisualCenterY}=getLayout();
+  const {VW,VH,sTop,sBot,sH,cw,ch,stageVisualCenterY,isMobile}=getLayout();
   CW=cw; CH=ch;
   arcPts=calcArcPts(deck.length,sH,VW,CW,CH,sTop,stageVisualCenterY);
+  mobileFanX=isMobile?0:0;
+  mobilePeekIdx=-1;
+  applyMobileFanTransform();
 
   deck.forEach((c,i)=>{
     const el=document.createElement('div');
@@ -1005,9 +1074,82 @@ function _buildFan(animate){
   });
 }
 
+function isMobileDraw(){
+  return window.innerWidth<=MOBILE_DRAW_BREAKPOINT;
+}
+function clampMobileFanX(x){
+  if(!arcPts.length||!isMobileDraw()) return 0;
+  const minLeft=Math.min(...arcPts.map(p=>p.left));
+  const maxRight=Math.max(...arcPts.map(p=>p.left+CW));
+  const minX=Math.min(0,window.innerWidth-maxRight-window.innerWidth*.08);
+  const maxX=Math.max(0,-minLeft+window.innerWidth*.08);
+  return Math.max(minX,Math.min(maxX,x));
+}
+function applyMobileFanTransform(){
+  if(!stageEl) return;
+  if(!isMobileDraw()){
+    stageEl.style.transform='';
+    return;
+  }
+  mobileFanX=clampMobileFanX(mobileFanX);
+  stageEl.style.transform=`translateX(${mobileFanX}px)`;
+}
+function getCenterCardIndex(){
+  if(!arcPts.length) return -1;
+  const center=window.innerWidth/2;
+  let best=-1,bestDist=Infinity;
+  arcPts.forEach((p,i)=>{
+    if(drawn.includes(i)) return;
+    const dist=Math.abs((p.left+mobileFanX+CW/2)-center);
+    if(dist<bestDist){best=i;bestDist=dist;}
+  });
+  return best;
+}
+function updateMobilePeek(){
+  if(!isMobileDraw()) return;
+  const idx=getCenterCardIndex();
+  if(idx===mobilePeekIdx) return;
+  stageEl.querySelectorAll('.card.peek').forEach(el=>el.classList.remove('peek'));
+  mobilePeekIdx=idx;
+  const el=stageEl.querySelector(`[data-i="${idx}"]`);
+  if(el&&!el.classList.contains('pk')&&!el.classList.contains('dm')) el.classList.add('peek');
+}
+function initMobileFanDrag(){
+  stWrap.addEventListener('pointerdown',e=>{
+    if(!isMobileDraw()||picking||done) return;
+    mobileDrag={startX:e.clientX,lastX:e.clientX,baseX:mobileFanX,moved:false};
+    stWrap.setPointerCapture?.(e.pointerId);
+    stopSway();
+  });
+  stWrap.addEventListener('pointermove',e=>{
+    if(!mobileDrag||!isMobileDraw()||picking||done) return;
+    const dx=e.clientX-mobileDrag.startX;
+    mobileDrag.lastX=e.clientX;
+    if(Math.abs(dx)>8) mobileDrag.moved=true;
+    mobileFanX=clampMobileFanX(mobileDrag.baseX+dx);
+    applyMobileFanTransform();
+    updateMobilePeek();
+  });
+  function finishDrag(e){
+    if(!mobileDrag) return;
+    const moved=mobileDrag.moved;
+    mobileDrag=null;
+    stWrap.releasePointerCapture?.(e.pointerId);
+    updateMobilePeek();
+    if(moved&&mobilePeekIdx>=0&&!picking&&!done) onPick(mobilePeekIdx);
+    else if(!picking&&!done) startSway();
+  }
+  stWrap.addEventListener('pointerup',finishDrag);
+  stWrap.addEventListener('pointercancel',finishDrag);
+}
+
 /* ══ 摇摆 ══ */
 function startSway(){
   stopSway();
+  if(isMobileDraw()){
+    updateMobilePeek();
+    return;
+  }
   const SPD=.008,MAX=2.8;
   let cards=[...stageEl.querySelectorAll('.card:not(.pk):not(.dm)')];
   function tick(){
@@ -1458,7 +1600,7 @@ function copyReading(){
 
 /* ══ 洗牌（回到抽牌页）══ */
 function doShuffle(){
-  stopSway(); drawn=[]; done=picking=false; sway=0; swayDir=1;
+  stopSway(); drawn=[]; done=picking=false; sway=0; swayDir=1; mobileFanX=0; mobilePeekIdx=-1; mobileDrag=null;
   deck=cryptoShuffle(buildDeck());
   buildFan(true); // 带动画
   updPg();
@@ -1478,7 +1620,7 @@ function backToPick(){
 
 /* ══ 从头开始（回封面）══ */
 function resetAll(){
-  stopSway(); drawn=[]; done=picking=false; sway=0; swayDir=1;
+  stopSway(); drawn=[]; done=picking=false; sway=0; swayDir=1; mobileFanX=0; mobilePeekIdx=-1; mobileDrag=null;
   lastReadingText=''; userQuestion='';
   document.getElementById('coverQ').value='';
   deck=[];
@@ -1508,6 +1650,7 @@ document.getElementById('coverQ').addEventListener('keydown',e=>{
 // 页面加载后立即开始预加载所有牌面图片
 preloadAllImages();
 syncReadingLanguageUI();
+initMobileFanDrag();
 
 let rt=null;
 window.addEventListener('resize',()=>{
